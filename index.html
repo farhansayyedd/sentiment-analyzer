@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sentiment Analyzer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 16px}
+h1{font-size:1.8rem;font-weight:700;margin-bottom:4px;text-align:center}
+h1 span{color:#7c3aed}
+.sub{color:#8b949e;font-size:.9rem;margin-bottom:32px;text-align:center}
+.card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:28px;width:100%;max-width:620px;margin-bottom:20px}
+textarea{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:1rem;padding:14px;resize:vertical;min-height:140px;outline:none;font-family:inherit;transition:border-color .2s}
+textarea:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.15)}
+.btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+button{padding:10px 22px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem;transition:all .2s}
+.btn-analyze{background:#7c3aed;color:#fff}
+.btn-analyze:hover{background:#6d28d9;transform:scale(1.03)}
+.btn-clear{background:#1e2430;color:#8b949e;border:1px solid #30363d}
+.btn-clear:hover{border-color:#7c3aed;color:#c4b5fd}
+/* Results */
+.result-card{display:none;background:#161b22;border:1px solid #30363d;border-radius:14px;padding:28px;width:100%;max-width:620px}
+.result-card.show{display:block}
+.sentiment-badge{display:inline-flex;align-items:center;gap:10px;padding:10px 20px;border-radius:30px;font-size:1.3rem;font-weight:700;margin-bottom:20px}
+.positive{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e}
+.negative{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:#f85149}
+.neutral{background:rgba(139,148,158,.12);border:1px solid rgba(139,148,158,.3);color:#8b949e}
+.conf-label{font-size:.8rem;color:#8b949e;margin-bottom:8px}
+.bar-track{background:#30363d;border-radius:20px;height:10px;overflow:hidden;margin-bottom:20px}
+.bar-fill{height:100%;border-radius:20px;transition:width .8s ease}
+.scores{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.score-item{background:#0d1117;border-radius:8px;padding:14px;text-align:center}
+.score-val{font-size:1.1rem;font-weight:600;margin-bottom:4px}
+.score-lbl{font-size:.72rem;color:#8b949e;text-transform:uppercase;letter-spacing:.06em}
+.keywords{margin-top:16px}
+.kw-label{font-size:.8rem;color:#8b949e;margin-bottom:8px}
+.kw-list{display:flex;flex-wrap:wrap;gap:6px}
+.kw{padding:3px 10px;font-size:.78rem;border-radius:4px}
+.kw-pos{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e}
+.kw-neg{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:#f85149}
+.examples{margin-top:12px}
+.ex-lbl{font-size:.78rem;color:#8b949e;margin-bottom:8px}
+.ex-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ex-chip{background:#1e2430;border:1px solid #30363d;border-radius:6px;padding:6px 12px;font-size:.78rem;cursor:pointer;color:#8b949e;text-align:left}
+.ex-chip:hover{border-color:#7c3aed;color:#c4b5fd}
+</style>
+</head>
+<body>
+<h1>🧠 Sentiment <span>Analyzer</span></h1>
+<p class="sub">Classify text as Positive, Negative, or Neutral — powered by VADER-like JS algorithm</p>
+
+<div class="card">
+  <textarea id="input-text" placeholder="Type or paste your text here… e.g. 'I love this course, it's amazing!'"></textarea>
+  <div class="btn-row">
+    <button class="btn-analyze" onclick="analyze()">Analyze Sentiment</button>
+    <button class="btn-clear" onclick="clearAll()">Clear</button>
+  </div>
+  <div class="examples" style="margin-top:20px">
+    <div class="ex-lbl">Try an example:</div>
+    <div class="ex-chips">
+      <div class="ex-chip" onclick="setEx(this)">I absolutely love this product! It's amazing!</div>
+      <div class="ex-chip" onclick="setEx(this)">This is terrible. Worst experience ever.</div>
+      <div class="ex-chip" onclick="setEx(this)">The weather today is okay, nothing special.</div>
+      <div class="ex-chip" onclick="setEx(this)">Great job! Very happy with the results.</div>
+      <div class="ex-chip" onclick="setEx(this)">I'm really disappointed and frustrated.</div>
+    </div>
+  </div>
+</div>
+
+<div class="result-card" id="result">
+  <div id="badge" class="sentiment-badge"></div>
+  <div class="conf-label">Confidence: <span id="conf-val"></span></div>
+  <div class="bar-track"><div id="bar" class="bar-fill"></div></div>
+  <div class="scores">
+    <div class="score-item"><div class="score-val" id="s-pos" style="color:#22c55e"></div><div class="score-lbl">Positive</div></div>
+    <div class="score-item"><div class="score-val" id="s-neu" style="color:#8b949e"></div><div class="score-lbl">Neutral</div></div>
+    <div class="score-item"><div class="score-val" id="s-neg" style="color:#f85149"></div><div class="score-lbl">Negative</div></div>
+  </div>
+  <div class="keywords" id="kw-section" style="display:none">
+    <div class="kw-label">Detected Keywords:</div>
+    <div id="kw-list" class="kw-list"></div>
+  </div>
+</div>
+
+<script>
+// VADER-inspired lexicon (simplified but effective)
+var POS=['love','amazing','excellent','great','good','awesome','fantastic','outstanding','perfect','happy','joy','wonderful','superb','brilliant','nice','best','beautiful','enjoy','glad','positive','pleased','thrilled','excited','magnificent','lovely','incredible','success','win','like','impressive'];
+var NEG=['hate','terrible','awful','horrible','bad','worst','poor','disgusting','dreadful','ugly','sad','angry','frustrating','disappointed','awful','failure','fail','boring','wrong','broken','useless','stupid','annoying','irritating','unacceptable','terrible','horrible','waste'];
+var INTENSIFIERS={'very':1.3,'really':1.25,'absolutely':1.4,'totally':1.35,'extremely':1.45,'rather':1.1,'quite':1.05,'so':1.2};
+var NEGATORS=['not','never','no','without','neither','nor',"don't","doesn't","didn't","won't"];
+var EMOJIS={'😊':0.5,'😍':0.7,'😄':0.5,'❤️':0.6,'👍':0.4,'✅':0.3,'😔':-.5,'😢':-.6,'😠':-.6,'😡':-.7,'💔':-.6,'👎':-.4,'❌':-.4};
+
+function tokenize(text){return text.toLowerCase().replace(/[^\w\s😊😍😄❤️👍✅😔😢😠😡💔👎❌]/g,' ').split(/\s+/).filter(Boolean);}
+
+function score(text){
+  var tokens=tokenize(text);
+  var pos=0,neg=0,intensity=1,negate=false;
+  var posWords=[],negWords=[];
+  for(var i=0;i<tokens.length;i++){
+    var t=tokens[i];
+    if(NEGATORS.includes(t)){negate=true;continue;}
+    if(INTENSIFIERS[t]){intensity=INTENSIFIERS[t];continue;}
+    // emoji check
+    for(var em in EMOJIS){if(t.includes(em)){var ev=EMOJIS[em];negate?neg+=Math.abs(ev):ev>0?pos+=ev:neg+=Math.abs(ev);}}
+    if(POS.includes(t)){var v=1*intensity*(negate?-1:1);if(v>0){pos+=v;posWords.push(t);}else{neg+=Math.abs(v);negWords.push(t);}}
+    else if(NEG.includes(t)){var vn=1*intensity*(negate?-1:1);if(vn<0){neg+=Math.abs(vn);negWords.push(t);}else{pos+=vn;posWords.push(t);}}
+    intensity=1;negate=false;
+  }
+  var total=pos+neg+0.001;
+  var posScore=pos/total,negScore=neg/total,neuScore=1-posScore-negScore;
+  neuScore=Math.max(0,neuScore);
+  var compound=pos>neg?posScore-negScore:negScore>pos?negScore-posScore:0;
+  var sentiment=compound>0.15?'positive':compound<-0.15?'negative':'neutral';
+  var confidence=sentiment==='neutral'?(0.4+neuScore*0.6):compound;
+  return{sentiment,confidence:Math.min(0.99,Math.abs(confidence)),positive:posScore,negative:negScore,neutral:neuScore,posWords:[...new Set(posWords)],negWords:[...new Set(negWords)]};
+}
+
+function analyze(){
+  var text=document.getElementById('input-text').value.trim();
+  if(!text){alert('Please enter some text first.');return;}
+  var r=score(text);
+  var labels={'positive':'Positive 😊','negative':'Negative 😔','neutral':'Neutral 😐'};
+  var colors={'positive':'positive','negative':'negative','neutral':'neutral'};
+  var barColors={'positive':'#22c55e','negative':'#f85149','neutral':'#8b949e'};
+  document.getElementById('badge').className='sentiment-badge '+colors[r.sentiment];
+  document.getElementById('badge').textContent=labels[r.sentiment];
+  document.getElementById('conf-val').textContent=(r.confidence*100).toFixed(1)+'%';
+  document.getElementById('bar').style.width=(r.confidence*100)+'%';
+  document.getElementById('bar').style.background=barColors[r.sentiment];
+  document.getElementById('s-pos').textContent=(r.positive*100).toFixed(1)+'%';
+  document.getElementById('s-neu').textContent=(r.neutral*100).toFixed(1)+'%';
+  document.getElementById('s-neg').textContent=(r.negative*100).toFixed(1)+'%';
+  var allKw=r.posWords.map(function(w){return '<span class="kw kw-pos">+'+w+'</span>';}).concat(r.negWords.map(function(w){return '<span class="kw kw-neg">-'+w+'</span>';}));
+  if(allKw.length){document.getElementById('kw-list').innerHTML=allKw.join('');document.getElementById('kw-section').style.display='';}
+  else document.getElementById('kw-section').style.display='none';
+  document.getElementById('result').classList.add('show');
+}
+function clearAll(){document.getElementById('input-text').value='';document.getElementById('result').classList.remove('show');}
+function setEx(el){document.getElementById('input-text').value=el.textContent;analyze();}
+</script>
+</body>
+</html>
